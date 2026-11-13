@@ -1,0 +1,35 @@
+# Evidence and sensitive outputs — never commit raw evidence
+evidence/
+working/
+raw-images/
+*.dd
+*.img
+*.E01
+*.001
+*.aff
+*.aff4
+
+# Recovered files may contain sensitive information
+recovered/
+recovered-files/
+*.recovered
+
+# Case-local raw outputs
+cases/*/evidence/
+cases/*/working/
+cases/*/recovered/
+cases/*/logs/*.log
+cases/*/logs/*.jsonl
+cases/*/analysis/raw-output/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Local environment and generated manifests
+.env
+*.local
+evidence-hashes.json
+recovery-validation.json

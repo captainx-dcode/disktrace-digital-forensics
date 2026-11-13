@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DiskTrace Investigation Event",
+  "type": "object",
+  "required": [
+    "event_id",
+    "case_id",
+    "timestamp_utc",
+    "operator",
+    "event_type",
+    "action",
+    "status",
+    "previous_event_hash",
+    "event_hash"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "timestamp_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "operator": {
+      "type": "string",
+      "minLength": 1
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "case",
+        "evidence",
+        "acquisition",
+        "hashing",
+        "partition_analysis",
+        "filesystem_analysis",
+        "metadata_analysis",
+        "recovery",
+        "validation",
+        "reporting",
+        "quality_review",
+        "other"
+      ]
+    },
+    "action": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tool": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "tool_version": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "command": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "input_reference": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "output_reference": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "planned",
+        "started",
+        "completed",
+        "failed",
+        "partial",
+        "not_validated",
+        "blocked"
+      ]
+    },
+    "notes": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "previous_event_hash": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "event_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "additionalProperties": false
+}
