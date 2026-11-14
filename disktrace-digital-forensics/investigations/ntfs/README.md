@@ -1,7 +1,7 @@
 # NTFS Forensics Investigation
 
-**Investigation:** 001 – NTFS Disk Image Examination  
-**Status:** In progress  
+**Investigation:** 001 – NTFS Disk Image Examination
+**Status:** In progress
 **Primary evidence image:** `forensic_image.dd`
 
 ## 1. Investigation scope
@@ -14,15 +14,15 @@ This README is the running guide and task record for the NTFS investigation. It 
 
 The lab directory listing during Task 1 showed these files:
 
-| Filename | Size shown by `ls -lh` | Role |
-|---|---:|---|
-| `forensic_image.dd` | 50 MB | NTFS investigation image (to be examined in subsequent tasks) |
-| `fat32_forensic.dd` | 50 MB | Reserved for the FAT32 investigation |
-| `corrupted_drive.dd` | 50 MB | Supplied lab image; role to be established if required |
-| `M2_lab.dd` | 29 MB | Supplied lab image; role to be established if required |
-| `carve_jpg.py` | 1.8 KB | Supplied Python script |
-| `carvepng.py` | 2.0 KB | Supplied Python script |
-| `file_carver.py` | 1.9 KB | Supplied Python script |
+| Filename               | Size shown by `ls -lh` | Role                                                          |
+| ---------------------- | -----------------------: | ------------------------------------------------------------- |
+| `forensic_image.dd`  |                    50 MB | NTFS investigation image (to be examined in subsequent tasks) |
+| `fat32_forensic.dd`  |                    50 MB | Reserved for the FAT32 investigation                          |
+| `corrupted_drive.dd` |                    50 MB | Supplied lab image; role to be established if required        |
+| `M2_lab.dd`          |                    29 MB | Supplied lab image; role to be established if required        |
+| `carve_jpg.py`       |                   1.8 KB | Supplied Python script                                        |
+| `carvepng.py`        |                   2.0 KB | Supplied Python script                                        |
+| `file_carver.py`     |                   1.9 KB | Supplied Python script                                        |
 
 The sizes above are the values displayed by the Task 1 `ls -lh` output, not forensic measurements of the underlying evidence.
 
@@ -30,15 +30,15 @@ The sizes above are the values displayed by the Task 1 `ls -lh` output, not fore
 
 The actual environment used for Task 1 was:
 
-| Component | Observed value |
-|---|---|
-| Host | Kali Linux |
-| Analysis environment | Ubuntu-based Docker container |
-| Docker image | `machokadee/forensics-lab:latest` |
-| Container working directory | `/home/student/Forensics` |
-| Container user | `root` |
-| Sleuth Kit | 4.12.1 |
-| Package version | `4.12.1+dfsg-1.1ubuntu2` |
+| Component                   | Observed value                      |
+| --------------------------- | ----------------------------------- |
+| Host                        | Kali Linux                          |
+| Analysis environment        | Ubuntu-based Docker container       |
+| Docker image                | `machokadee/forensics-lab:latest` |
+| Container working directory | `/home/student/Forensics`         |
+| Container user              | `root`                            |
+| Sleuth Kit                  | 4.12.1                              |
+| Package version             | `4.12.1+dfsg-1.1ubuntu2`          |
 
 **Environment clarification:** The task sheet describes launching an Ubuntu VM in VirtualBox. The recorded session instead used an Ubuntu-based Docker container on a Kali host. Do not describe this session as a VirtualBox VM. Confirm with the instructor whether the Docker-based environment is an accepted substitute if the VM requirement is strict.
 
@@ -128,18 +128,123 @@ This completes the practical environment checks recorded for Task 1. The screens
 
 Save actual terminal screenshots in `screenshots/` using these suggested filenames:
 
-| Screenshot | What it should show |
-|---|---|
-| `01-docker-image-pull.png` | Successful Docker image pull |
-| `02-container-launch-and-identity.png` | Corrected container launch and `id` / `whoami` |
-| `03-working-directory-and-materials.png` | `pwd` and `ls -lh` |
-| `04-sleuthkit-version.png` | `fls -V`, `fsstat -V`, and package version |
+| Screenshot                                 | What it should show                                |
+| ------------------------------------------ | -------------------------------------------------- |
+| `01-docker-image-pull.png`               | Successful Docker image pull                       |
+| `02-container-launch-and-identity.png`   | Corrected container launch and `id` / `whoami` |
+| `03-working-directory-and-materials.png` | `pwd` and `ls -lh`                             |
+| `04-sleuthkit-version.png`               | `fls -V`, `fsstat -V`, and package version     |
 
 Do not recreate or fabricate terminal screenshots. Capture the real output from the lab. The failed `--priileged` attempt may be omitted from the evidence screenshots; the documentation records the typo for transparency.
 
-### Task 2 – To be completed
+## Task 2: File System Identification and Metadata Collection
 
-Do not add findings here until the next task has been performed. Record its objective, commands, actual output, screenshots, observations, and limitations.
+### Objective
+
+Identify the file system used by the supplied forensic disk image and collect essential NTFS metadata to support subsequent examination and recovery activities.
+
+### 1. Identify the File System
+
+The `file` utility was used to inspect the disk image and identify its file system characteristics.
+
+**Command:**
+
+```bash
+file forensic_image.dd
+```
+
+**Key output:**
+
+```text
+DOS/MBR boot sector
+OEM-ID "NTFS"
+sectors/cluster 8
+NTFS
+$MFT start cluster 4
+$MFTMirror start cluster 6399
+serial number 06fbf04657eaf9a0a
+```
+
+The output identified the image as containing an NTFS file system. It also provided initial information about the location of the Master File Table (MFT), its mirror, and the volume serial number.
+
+### 2. Collect File System Metadata
+
+Sleuth Kit's `fsstat` utility was used to examine the file system metadata directly from the disk image.
+
+**Command:**
+
+```bash
+fsstat forensic_image.dd
+```
+
+### 3. Findings
+
+The following information was extracted from the `fsstat` output:
+
+| Attribute                | Observed value       |
+| ------------------------ | -------------------- |
+| File system              | NTFS                 |
+| Volume serial number     | `6FBF04657EAF9A0A` |
+| Reported NTFS version    | Windows XP           |
+| Sector size              | 512 bytes            |
+| Cluster size             | 4096 bytes           |
+| First MFT cluster        | 4                    |
+| First MFT Mirror cluster | 6399                 |
+| MFT entry size           | 1024 bytes           |
+| Index record size        | 4096 bytes           |
+| Root directory entry     | 5                    |
+| Total cluster range      | 0–12798             |
+| Total sector range       | 0–102398            |
+
+### 4. Technical Interpretation
+
+**Cluster size calculation**
+
+The file system reports 8 sectors per cluster. Each sector is 512 bytes.
+
+```text
+Cluster size = Sectors per cluster × Sector size
+             = 8 × 512
+             = 4096 bytes
+```
+
+This confirms that each NTFS cluster occupies 4096 bytes (4 KiB).
+
+**Master File Table (MFT)**
+
+The first MFT cluster is 4. The MFT stores file and directory metadata, including file names, timestamps, attributes, and references to file content.
+
+Assuming the file system volume begins at byte offset zero:
+
+```text
+MFT starting offset = MFT starting cluster × Cluster size
+                    = 4 × 4096
+                    = 16384 bytes
+                    = 0x4000
+```
+
+**MFT Mirror**
+
+The MFT Mirror begins at cluster 6399. NTFS maintains copies of selected critical MFT records in this location to support recovery of important file system metadata.
+
+**Root Directory**
+
+The root directory is identified by MFT entry 5, a standard NTFS root directory reference.
+
+### 5. Conclusion
+
+The examination identified the supplied forensic image as an NTFS volume. The `fsstat` output established its sector and cluster sizes, MFT locations, MFT entry size, volume serial number, and root directory reference.
+
+These findings provide the initial file system metadata required for subsequent NTFS investigation tasks.
+
+### Evidence
+
+- `screenshots/02-filesystem-identification.png` — consolidated terminal screenshot showing the `file` and `fsstat` commands and their output.
+
+### Tools Used
+
+- `file` — initial file system identification.
+- Sleuth Kit `fsstat` — file system metadata examination.
 
 ### Task 3 onward – To be completed
 
