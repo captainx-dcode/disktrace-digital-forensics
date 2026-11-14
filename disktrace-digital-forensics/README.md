@@ -1,115 +1,84 @@
-# DiskTrace — Digital Forensics & Data Recovery Laboratory
 
-**Status:** Phase 1 — Initiation and Planning  
-**Project type:** Independent cybersecurity / digital-forensics portfolio project  
-**Repository:** `disktrace-digital-forensics`
+# DiskTrace – Digital Forensics & Data Recovery Laboratory
 
-## Purpose
+DiskTrace is a practical digital forensics learning and portfolio project. It documents structured investigations of disk images, file-system metadata, deleted-file recovery, raw data examination, and selected forensic automation.
 
-DiskTrace is a structured digital-forensics laboratory for practicing and documenting the examination of disk images. It covers evidence preservation, disk and partition structures, NTFS and FAT32 analysis, deleted-file recovery, file carving, integrity validation, investigation logging, and professional reporting.
+The investigations will be completed in this order:
 
-The project also develops a small automation layer that consumes structured investigation records and produces repeatable evidence manifests and report inputs.
+1. **NTFS Forensics** – examine the supplied NTFS image and document each task as it is performed.
+2. **FAT32 Forensics** – examine the supplied FAT32 image and compare its structures and recovery process with NTFS.
+3. **Raw Disk Forensics** – investigate raw data and file carving techniques that do not depend primarily on file-system metadata.
 
-> **Important:** This is an educational lab. Use only disk images you own or are explicitly authorized to examine. Do not publish original evidence images, personal data, recovered confidential files, credentials, or other sensitive material.
+> **Progress rule:** This repository is a working record, not a claim that all investigations are complete. Only procedures actually performed and outputs actually observed should be marked complete. Screenshots should be captured during each task and added before committing that task.
 
-## Project goals
+## Project objectives
 
-1. Preserve and identify forensic evidence using repeatable procedures.
-2. Examine raw disk images and identify partition and file-system structures.
-3. Analyze NTFS structures, including the Master File Table (MFT).
-4. Analyze FAT32 structures, including FAT tables and cluster chains.
-5. Recover deleted files using file-system metadata where possible and file carving where appropriate.
-6. Validate recovered artifacts and document recovery limitations.
-7. Maintain structured, machine-readable investigation logs.
-8. Generate clear, evidence-based investigation reports.
+- Identify disk-image and file-system formats.
+- Examine file-system structures and metadata.
+- Locate deleted, orphaned, and potentially recoverable file entries.
+- Explore recovery using established forensic utilities.
+- Develop Python utilities for selected forensic tasks.
+- Record hashes and validate extraction results appropriately.
+- Maintain clear evidence handling, reproducibility, and investigative reporting.
 
-## Important terminology
+## Investigation roadmap
 
-- **NTFS** and **FAT32** are file systems.
-- The **MFT (Master File Table)** is a central NTFS metadata structure; it is not a separate file system.
-- A **RAW `.dd` image** is a byte-for-byte disk-image representation. It is not itself a file system. It may contain a partition table and an NTFS/FAT32 volume, or a file system beginning directly at the start of the image.
+| Investigation                                | Evidence image        | Status                                                               |
+| -------------------------------------------- | --------------------- | -------------------------------------------------------------------- |
+| [NTFS](investigations/ntfs/README.md)         | `forensic_image.dd` | Task 1: environment preparation documented; subsequent tasks pending |
+| [FAT32](investigations/fat32/README.md)       | `fat32_forensic.dd` | Not started                                                          |
+| [Raw disk](investigations/raw-disk/README.md) | To be confirmed       | Not started                                                          |
 
-## SDLC approach
-
-| Phase | Focus | Exit evidence |
-|---|---|---|
-| 1. Initiation and planning | Problem, objectives, scope, risks | Approved project charter |
-| 2. Requirements analysis | Functional and quality requirements | Requirements baseline |
-| 3. Design | Architecture, evidence model, log schemas, report structure | Design review |
-| 4. Implementation | Examination workflows and Python utilities | Version-controlled implementation |
-| 5. Testing and validation | Test cases, repeatability, integrity checks | Test results |
-| 6. Investigation and reporting | Case execution, findings, conclusions | Reviewed case report |
-| 7. Deployment and documentation | Repository release and demonstrations | Public portfolio release |
-| 8. Evaluation and maintenance | Lessons, limitations, improvements | Retrospective and backlog |
-
-A phase is not considered complete merely because commands ran. Its exit criteria must be met and documented.
-
-## Repository map
+## Repository layout
 
 ```text
-disktrace-digital-forensics/
-├── README.md
-├── LICENSE
-├── .gitignore
-├── docs/
-│   ├── project-charter.md
-│   ├── sdlc-roadmap.md
-│   ├── requirements.md
-│   ├── architecture-and-data-design.md
-│   ├── evidence-handling-procedure.md
-│   ├── forensic-methodology.md
-│   └── reporting-standard.md
-├── schemas/
-│   ├── investigation-event.schema.json
-│   └── finding.schema.json
-├── templates/
-│   ├── case-intake.md
-│   ├── investigation-report.md
-│   ├── evidence-register.csv
-│   ├── activity-log.csv
-│   ├── findings-register.csv
-│   └── recovery-register.csv
-├── cases/
-│   └── DFL-2026-001/
-│       ├── case.json
-│       ├── README.md
-│       ├── logs/
-│       ├── analysis/
-│       ├── findings/
-│       ├── reports/
-│       └── screenshots/
-├── scripts/
-│   ├── hash_evidence.py
-│   ├── log_event.py
-│   └── validate_recovery.py
-├── tests/
-│   └── README.md
-└── media/
-    └── demonstration-plan.md
+documentation/       Shared methodology and evidence-handling guidance
+investigations/      Separate investigation workspaces
+  ntfs/              NTFS tasks, notes, screenshots, and scripts
+  fat32/             FAT32 tasks, notes, screenshots, and scripts
+  raw-disk/          Raw disk examination and carving
+reports/             Final investigation reports
+media/               Shared diagrams and supporting media
 ```
 
-## Initial case
+Each investigation has its own README. Its README is updated as work progresses; planned work must remain labelled as planned.
 
-`DFL-2026-001` is a **training scenario** concerning suspected deletion of work-related documents. The scenario is fictional; actual evidence contents and findings must come from examination, not assumptions.
+## Working methodology
 
-Candidate lab images previously identified:
-- `forensic_image.dd`
-- `fat32_forensic.dd`
-- `corrupted_drive.dd`
-- `M2_lab.dd`
+Each task should follow this sequence:
 
-These are candidates only. Their file-system types, contents, and suitability must be verified before assigning them to a case exhibit.
+1. Read the task and identify its objective.
+2. Execute the commands in the lab.
+3. Inspect and understand the actual output.
+4. Capture screenshots showing the relevant terminal output.
+5. Record observations, findings, and limitations.
+6. Update the investigation documentation.
+7. Commit the completed task and its supporting screenshots.
 
-## Working principles
+Do not skip ahead or document results that have not yet been observed.
 
-- Preserve originals; examine verified working copies.
-- Record SHA-256 hashes and relevant acquisition details.
-- Record commands, tool versions, timestamps, outputs, and operator observations.
-- Separate confirmed observations from interpretations and hypotheses.
-- Do not describe a file as successfully recovered until it has been validated.
-- Record unsuccessful attempts and limitations as well as successful results.
-- Never invent timestamps, file contents, evidence provenance, or findings.
+## Evidence handling
 
-## Getting started
+- Preserve original disk images and do not perform analysis that modifies them.
+- Store extracted or recovered files separately from source evidence.
+- Record the commands, offsets, sizes, and hashes used during recovery.
+- Treat a matching hash between two outputs as evidence that those outputs are byte-identical; it does not by itself prove authenticity against an original pre-deletion file.
+- Distinguish confirmed observations from assumptions, inferences, attempted actions, and unverified results.
+- Do not upload original `.dd` images or potentially sensitive recovered files to this public repository.
 
-See [`docs/sdlc-roadmap.md`](docs/sdlc-roadmap.md). We will work phase by phase and review each phase before proceeding.
+## Laboratory environment note
+
+The first NTFS environment-preparation task was carried out using a Kali Linux host and an Ubuntu-based Docker container (`machokadee/forensics-lab:latest`). It was not performed inside VirtualBox. This distinction is recorded to keep the project documentation faithful to the environment actually used. If a later task explicitly requires VirtualBox, follow that requirement or document an approved alternative.
+
+## Tools
+
+Tools will be listed in the relevant investigation README as they are actually used. The initial NTFS environment confirmed The Sleuth Kit version 4.12.1.
+
+## Disclaimer
+
+DiskTrace is an educational and portfolio project using supplied or simulated forensic images in a controlled laboratory. The project does not claim that recovered files are necessarily complete, authentic, or legally admissible. Conclusions are limited to the evidence and methods documented in each investigation.
+
+## Author
+
+**Eugen Nyongesa**
+GitHub: [captainx-dcode](https://github.com/captainx-dcode)
