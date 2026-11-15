@@ -423,6 +423,104 @@ These findings establish the file's metadata and data location for the subsequen
 - Sleuth Kit `istat` — MFT entry and file metadata examination.
 - `printf` — decimal-to-hexadecimal offset conversion.
 
+## Task 4: Recover Deleted Files
+
+### Objective
+
+Recover the deleted `IMG_3046.jpg` file using two approaches:
+
+1. Sleuth Kit's `icat` utility, using the NTFS metadata address.
+2. The DiskTrace Python file-carving utility, using calculated byte offsets.
+
+### Method 1: Recover Using `icat`
+
+The deleted file was recovered using its MFT metadata address:
+
+```bash
+icat forensic_image.dd 64-128-2 > recovered.jpg
+```
+
+The output was inspected using:
+
+```bash
+file recovered.jpg
+```
+
+The `file` utility identified the recovered output as JPEG image data with the following properties:
+
+| Property                      | Result              |
+| ----------------------------- | ------------------- |
+| Format                        | JPEG                |
+| Dimensions                    | 3024 × 4032        |
+| Camera model in EXIF metadata | Apple iPhone 13 Pro |
+| JPEG type                     | Baseline            |
+
+### Method 2: Recover Using the DiskTrace Python Carver
+
+The improved DiskTrace utility, `file_carver2.py`, was used to extract the file using the start and end byte offsets calculated in Task 3.
+
+The offsets were stored in `offsets.txt`:
+
+```text
+# start_offset_hex,end_offset_hex,output_filename
+1B00000,25226DE,carved.jpg
+```
+
+The carver was executed using:
+
+```bash
+python3 file_carver2.py
+```
+
+Batch mode was selected, and `offsets.txt` was supplied.
+
+The utility successfully extracted the specified byte range.
+
+### Extraction Results
+
+| Field                  | Result                    |
+| ---------------------- | ------------------------- |
+| Source image           | `forensic_image.dd`     |
+| Start offset           | `0x1B00000`             |
+| End offset             | `0x25226DE` (exclusive) |
+| Bytes extracted        | 10,626,782                |
+| Output file            | `carved.jpg`            |
+| Successful extractions | 1                         |
+| Failed extractions     | 0                         |
+
+### SHA-256 of Python-Carved Output
+
+```text
+c22411c0175a240ab2f96257d6babaa1c6068a3a653ed346ec86444dc8c146c9
+```
+
+### Verification
+
+The two recovery outputs should be compared to establish whether they contain identical bytes:
+
+```bash
+file recovered.jpg carved.jpg
+sha256sum recovered.jpg carved.jpg
+cmp recovered.jpg carved.jpg
+echo $?
+```
+
+A `cmp` exit status of `0` indicates that the files are byte-for-byte identical. Record the actual comparison results before treating this verification as complete.
+
+### Tools Used
+
+- Sleuth Kit `icat`
+- Sleuth Kit `file`
+- Python 3
+- DiskTrace `file_carver2.py`
+- SHA-256 (`sha256sum`)
+- `cmp`
+
+### Evidence Screenshots
+
+- `screenshots/05-icat-file-recovery.png` — recovery using `icat` and JPEG identification.
+- `screenshots/06-python-file-carving.png` — Python carver execution and extraction results.
+
 ## 5. Screenshots directory
 
 Place task evidence in:
