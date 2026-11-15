@@ -521,6 +521,57 @@ A `cmp` exit status of `0` indicates that the files are byte-for-byte identical.
 - `screenshots/05-icat-file-recovery.png` — recovery using `icat` and JPEG identification.
 - `screenshots/06-python-file-carving.png` — Python carver execution and extraction results.
 
+
+
+## Task 5: Verify File Integrity (MD5 Hash Comparison)
+
+### Objective
+
+Verify the integrity of the recovered file by comparing its MD5 checksum against the reference checksum provided in the practical exercise.
+
+### Generate MD5 Hashes
+
+The following command was executed:
+
+```bash
+md5sum carved.jpg recovered.jpg
+```
+
+### Actual Results
+
+```text
+bfc40fd6b8adf2e7745d833de36b4bc0  carved.jpg
+bfc40fd6b8adf2e7745d833de36b4bc0  recovered.jpg
+```
+
+### Reference MD5
+
+The practical exercise provided the following reference checksum:
+
+```text
+bfc40fd6b8adf2e7745d833de36b4bc0
+```
+
+### Analysis
+
+Both recovered files produced identical MD5 checksums. Their checksums also match the reference value supplied in the exercise.
+
+This confirms that the `icat` extraction and the Python-based carving operation produced identical file contents and match the supplied reference checksum.
+
+**Note:** The reference checksum was supplied by the exercise. It was not independently calculated from a separate original copy of `IMG_3046.jpg`.
+
+### Conclusion
+
+The integrity verification was successful. Both recovery methods produced matching outputs according to the MD5 comparison.
+
+### Evidence Screenshot
+
+- `screenshots/08-md5-integrity-verification.png` — MD5 checksums of `carved.jpg` and `recovered.jpg`.
+
+### Tool Used
+
+- `md5sum` — MD5 checksum generation and comparison.
+
 ## 5. Screenshots directory
 
 Place task evidence in:
