@@ -4,400 +4,221 @@
 **Investigation:** 002 – FAT32 Disk Image Examination
 **Status:** In Progress
 **Evidence image:** `fat32_forensic.dd`
-**Examination environment:** Kali Linux / Docker forensic lab
-**Forensic toolkit:** The Sleuth Kit 4.12.1
-
----
 
 ## 1. Investigation Scope
 
-This investigation examines the supplied FAT32 forensic disk image to identify deleted files, examine their associated file-system metadata, recover available file contents, and assess the integrity of recovered evidence.
+This investigation examines a supplied FAT32 disk image to identify deleted files, inspect their filesystem metadata, recover their contents, and compare the results obtained using two recovery methods.
 
-The examination follows a structured digital forensic workflow. Each stage records the objective, commands, observations, findings, and supporting screenshots.
+The investigation uses The Sleuth Kit (TSK), including `fls`, `istat`, and `icat`, alongside a Python-based file carving script.
 
-The investigation focuses on:
+## 2. Investigation Tasks
 
-- Identification of the FAT32 file system and its structural metadata.
-- Examination of directory entries and deleted-file indicators.
-- Extraction and interpretation of file metadata.
-- Identification of the sectors occupied by deleted files.
-- Recovery using The Sleuth Kit and custom Python file-carving utilities.
-- Validation of recovered files using file signatures and cryptographic hashes.
+### Task 1: Prepare the Forensics Environment
 
-The evidence image is treated as a forensic source. Examination activities and generated recovery outputs are documented separately to maintain a clear distinction between source evidence and derived evidence.
+The investigation was conducted inside the provided Docker-based forensics environment.
 
-## 2. Investigation Log
-
-### Task 1: Forensic Environment Preparation
-
-**Objective:** Establish a controlled environment with the necessary forensic utilities to examine the supplied disk image.
-
-#### 1.1 Lab initialization
-
-The forensic environment was prepared using a Docker container based on `machokadee/forensics-lab:latest`.
-
-```bash
-docker pull machokadee/forensics-lab:latest
-
-docker run -it --rm --privileged machokadee/forensics-lab:latest
-```
-
-The container was checked using:
+**Environment verification:**
 
 ```bash
 whoami
 id
 pwd
-ls -lh
 ```
 
-**Environment observations:**
+The commands confirmed that the investigation was running as `root` in `/home/student/Forensics`.
 
-- Host operating system: Kali Linux.
-- Container image: `machokadee/forensics-lab:latest`.
-- Execution account: `root`.
-- Working directory: `/home/student/Forensics`.
-- Evidence image available: `fat32_forensic.dd`.
-- Additional supplied images included `forensic_image.dd`, `corrupted_drive.dd`, and `M2_lab.dd`.
+The evidence image `fat32_forensic.dd` was available in the working directory.
 
-#### 1.2 Sleuth Kit installation and verification
+### Task 2: Identify the Filesystem
 
-Package information was updated, and Sleuth Kit was installed or verified:
-
-```bash
-apt update
-apt install sleuthkit -y
-```
-
-The required utilities were checked:
-
-```bash
-fls -V
-fsstat -V
-```
-
-The tools provide the following capabilities:
-
-| Utility    | Forensic purpose                                                 |
-| ---------- | ---------------------------------------------------------------- |
-| `fls`    | Lists file and directory entries, including deleted entries.     |
-| `fsstat` | Examines file-system metadata and structural information.        |
-| `istat`  | Displays metadata associated with a specified file-system entry. |
-| `icat`   | Extracts file content using a file-system entry identifier.      |
-
-**Observation:** The required Sleuth Kit utilities were available in the forensic environment.
-
-**Evidence:** `screenshots/01-fat32-environment-setup.png`
-
----
-
-### Task 2: File-System Identification and Structural Examination
-
-**Objective:** Identify the file-system type and establish its structural characteristics before examining individual files.
-
-#### 2.1 File-system identification
-
-The `file` utility was used to inspect the supplied image:
+The following commands were used to identify the filesystem and inspect its metadata:
 
 ```bash
 file fat32_forensic.dd
-```
-
-The output identified a DOS/MBR boot-sector image with a FAT32 file system. The OEM identifier was `mkfs.fat`.
-
-The file-system structure was then examined using:
-
-```bash
 fsstat fat32_forensic.dd
 ```
 
-The output confirmed that the file system is FAT32.
+**Findings:**
 
-#### 2.2 Structural findings
+- Filesystem: FAT32
+- Sector size: 512 bytes
+- Cluster size: 512 bytes
+- Root directory cluster: 2
+- FAT copies: 2
+- Volume ID: `0xa742e8f9`
+- Volume label: `NO NAME`
 
-| Property               | Observed value       |
-| ---------------------- | -------------------- |
-| File-system type       | FAT32                |
-| OEM name               | `mkfs.fat`         |
-| Volume ID              | `0xa742e8f9`       |
-| Volume label           | `NO NAME`          |
-| Sector size            | 512 bytes            |
-| Cluster size           | 512 bytes            |
-| Sectors per cluster    | 1                    |
-| Root directory cluster | 2                    |
-| Root directory sector  | 1608                 |
-| Reserved sectors       | 0–31                |
-| FAT 0                  | Sectors 32–819      |
-| FAT 1                  | Sectors 820–1607    |
-| Data area              | Sectors 1608–102399 |
-| Total sector range     | 0–102399            |
-| Total cluster range    | 2–100793            |
+The filesystem begins at sector 0, as indicated by the `fsstat` output.
 
-**Interpretation:**
+### Task 3: Locate Deleted Files
 
-The image uses 512-byte sectors and 512-byte clusters. Consequently, each cluster contains one sector.
-
-The root directory is associated with cluster 2 and is located at sector 1608. Two File Allocation Tables are present, occupying sectors 32–819 and 820–1607.
-
-The data area begins at sector 1608.
-
-These values establish the file-system layout used during subsequent deleted-file examination.
-
-**Evidence:** `screenshots/02-fat32-filesystem-identification.png`
-
----
-
-### Task 3: Deleted-File Identification
-
-**Objective:** Identify deleted directory entries that may contain recoverable file metadata and content.
-
-The recursive file listing utility was used:
+The following command was used to recursively list filesystem entries:
 
 ```bash
 fls -r fat32_forensic.dd
 ```
 
-#### 3.1 Examination output
-
-The relevant output was:
+**Relevant output:**
 
 ```text
 r/r * 4:        IMG_2019.jpg
 r/r * 6:        IMG_0117.png
 ```
 
-The output identified two deleted file entries:
-
-| Directory entry | Filename reported by `fls` | Allocation status       |
-| --------------- | ---------------------------- | ----------------------- |
-| 4               | `IMG_2019.jpg`             | Deleted / Not allocated |
-| 6               | `IMG_0117.png`             | Deleted / Not allocated |
-
 The asterisk (`*`) indicates that the entries are deleted or not allocated.
 
-**Initial finding:** Two deleted image entries were identified in the FAT32 directory listing. Each entry will be examined independently to avoid mixing metadata, recovery results, and validation evidence.
+Two deleted image entries were identified:
 
-**Evidence:** `screenshots/03-fat32-deleted-file-listing.png`
+| Directory Entry | Filename         |
+| --------------- | ---------------- |
+| 4               | `IMG_2019.jpg` |
+| 6               | `IMG_0117.png` |
 
----
+### Task 4: Examine Metadata – IMG_2019.jpg
 
-### Task 4: Individual Deleted-File Examination
-
-#### Evidence Item 001 – IMG_2019.jpg
-
-**Objective:** Examine the metadata associated with the first deleted file, establish its storage location, and determine whether its contents can be recovered.
-
-##### 4.1 Metadata extraction
-
-The directory entry identified during the previous task was examined using:
+The following command was used:
 
 ```bash
 istat fat32_forensic.dd 4
 ```
 
-The command returned the following metadata:
+**Findings:**
 
-| Metadata field             | Observed value          |
-| -------------------------- | ----------------------- |
-| Directory entry            | 4                       |
-| Allocation status          | Not Allocated           |
-| File attributes            | File, Archive           |
-| Name reported by `istat` | `_MG_2019.JPG`        |
-| Size                       | 3,190,011 bytes         |
-| Written timestamp          | 2036-01-01 07:59:58 UTC |
-| Accessed timestamp         | 2025-03-07 00:00:00 UTC |
-| Created timestamp          | 2025-03-07 22:08:29 UTC |
-| First sector               | 32990                   |
-| Last sector                | 39220                   |
+- Directory entry: 4
+- Allocation status: Not Allocated
+- File attributes: File, Archive
+- Size: 3,190,011 bytes
+- Filename reported by `istat`: `_MG_2019.JPG`
+- Written: 2036-01-01 07:59:58 UTC
+- Accessed: 2025-03-07 00:00:00 UTC
+- Created: 2025-03-07 22:08:29 UTC
+- Sector range: 32990–39220
 
-**Filename observation:**
+**Observation:** The filename reported by `istat` differs from the name displayed by `fls`. The Written timestamp is also later than the Created timestamp. These discrepancies are documented as observed; their causes have not been established.
 
-The earlier `fls` output reported the filename as `IMG_2019.jpg`, whereas `istat` reported `_MG_2019.JPG`.
+### Task 5: Examine Metadata – IMG_0117.png
 
-Both names are recorded exactly as returned by the tools. The discrepancy is retained for further examination rather than assuming that one representation is correct.
-
-**Timestamp observation:**
-
-The Written timestamp is `2036-01-01 07:59:58 UTC`, which is later than the Created timestamp.
-
-This is an anomalous timestamp and should be investigated. The available output does not establish why the timestamp has this value, so no conclusion about its cause is made at this stage.
-
-##### 4.2 Storage location analysis
-
-The metadata reports that the file occupies sectors 32990 through 39220.
-
-The image has a sector size of 512 bytes.
-
-The starting byte offset is calculated as:
-
-```text
-Starting sector × Sector size
-
-32990 × 512 = 16,890,880 bytes
-```
-
-In hexadecimal:
-
-```text
-0x101B800
-```
-
-The file size reported by `istat` is 3,190,011 bytes.
-
-The logical extraction range is therefore:
-
-```text
-Start offset:  16,890,880 bytes
-File size:      3,190,011 bytes
-End offset:    20,080,891 bytes (exclusive)
-```
-
-The file occupies 6,231 sectors, from sector 32990 through sector 39220 inclusive.
-
-These values provide the storage location needed for an independent sector-based carving attempt.
-
-##### 4.3 File recovery using The Sleuth Kit
-
-The deleted file was extracted using `icat` with the recovery option:
+The following command was used:
 
 ```bash
-icat -r fat32_forensic.dd 4 > recovered_IMG_2019.jpg
+istat fat32_forensic.dd 6
 ```
 
-The resulting file was inspected:
+**Findings:**
+
+- Directory entry: 6
+- Allocation status: Not Allocated
+- File attributes: File, Archive
+- Size: 12,876,314 bytes
+- Filename reported by `istat`: `_MG_0117.PNG`
+- Written: 2025-03-07 22:09:00 UTC
+- Accessed: 2025-03-07 00:00:00 UTC
+- Created: 2025-03-07 22:09:01 UTC
+- Sector range: 39221–64370
+
+**Observation:** The filename reported by `istat` differs from the name displayed by `fls`. The Written timestamp precedes the Created timestamp by one second.
+
+### Task 6: Recover the Deleted Images
+
+Two recovery approaches were used to recover the identified image files.
+
+**Method 1: Recovery using `icat`**
 
 ```bash
-ls -lh recovered_IMG_2019.jpg
-file recovered_IMG_2019.jpg
+icat fat32_forensic.dd 4 > icat_IMG_2019.JPG
+icat fat32_forensic.dd 6 > icat_IMG_0117.png
 ```
 
-The `file` utility identified the recovered content as:
+This method used the identified filesystem directory entries to extract the file contents.
 
-- JPEG image data.
-- JFIF standard 1.02.
-- EXIF metadata present.
-- Manufacturer: Apple.
-- Device model: iPhone 13 Pro.
-- Image dimensions: 3024 × 4032.
-- 8-bit precision.
-- Three components.
+**Method 2: Recovery using the Python carving script**
 
-**Recovery finding:** The extraction produced a file that was recognized as a JPEG image. This establishes that the recovered output has a recognizable JPEG structure. It does not, by itself, establish that every byte of the original file was recovered correctly.
+The Python script `file_carver.py` was used to extract image data from specified byte offsets.
 
-##### 4.4 Independent Python file carving
-
-A second recovery approach was performed using the custom Python file-carving utility and an offset definition file.
-
-The offset definition was derived from the metadata:
+The offsets were supplied through `offset.txt`:
 
 ```text
-101B800,1323BFB,recovered_IMG_2019.jpg
+101bc00,13268fb,python_IMG_2019.JPG
+1326a00,1f6e41a,python_IMG_0117.png
 ```
 
-The carving utility was executed against the supplied image:
+The script was executed in batch mode:
 
 ```bash
 python3 file_carver.py
 ```
 
-The source image `fat32_forensic.dd` and the offset file `offsets.txt` were provided when prompted.
+**Recovered output files:**
 
-The script reported that the file was successfully carved and saved.
+| Recovery method | IMG_2019                | IMG_0117                |
+| --------------- | ----------------------- | ----------------------- |
+| `icat`        | `icat_IMG_2019.JPG`   | `icat_IMG_0117.png`   |
+| Python          | `python_IMG_2019.JPG` | `python_IMG_0117.png` |
 
-**Observation:** The Python utility used the calculated byte range to extract the file independently of the `icat` command.
+Separate filenames were maintained for each recovery method to prevent one output from overwriting another.
 
-**Evidence:** `screenshots/04-fat32-img-2019-metadata.png`
+### Task 7: Verify Recovery Results Using MD5
 
-**Evidence:** `screenshots/05-fat32-img-2019-icat-recovery.png`
+MD5 checksums were calculated to compare the files recovered using `icat` against those recovered using the Python script.
 
-**Evidence:** `screenshots/06-fat32-img-2019-python-carving.png`
+**IMG_2019.jpg:**
 
-##### 4.5 Recovery validation
-
-The recovered file was recognized as JPEG image data by the `file` utility.
-
-A cryptographic hash comparison between independently retained `icat` and Python-carved outputs is still required before claiming that both recovery methods produced identical contents.
-
-**Validation status:** File format identified; hash comparison pending.
-
-##### 4.6 Evidence and interpretation
-
-The examination of directory entry 4 established that:
-
-1. The entry is marked as not allocated.
-2. The file metadata reports a logical size of 3,190,011 bytes.
-3. Its recorded sector range is 32990–39220.
-4. The metadata contains a discrepancy in the reported filename.
-5. The Written timestamp is anomalous and requires cautious interpretation.
-6. A JPEG file was extracted using `icat`.
-7. The Python carving utility also reported a successful extraction.
-
-The metadata and recovery results are retained as separate observations. No attribution, user identity, deletion time, or explanation for the timestamp anomaly is inferred from the available evidence.
-
----
-
-### Task 5: Separate Examination of the Second Deleted File
-
-**Evidence Item 002 – IMG_0117.png**
-
-The second deleted entry is directory entry 6, reported by `fls` as `IMG_0117.png`.
-
-It will be documented as a separate evidence examination, with its own metadata record, storage-location calculations, recovery procedure, validation results, and supporting screenshots.
-
-Its findings must not be combined with Evidence Item 001.
-
----
-
-## 3. Evidence Management and Screenshots
-
-Screenshots and generated evidence are stored separately from the source forensic image.
-
-Save genuine terminal screenshots under:
-
-```text
-screenshots/
+```bash
+md5sum icat_IMG_2019.JPG python_IMG_2019.JPG
 ```
 
-Evidence filenames should identify the examination stage and the associated evidence item.
-
-The source image should remain unchanged during examination. Recovered files, offset definitions, logs, and reports should be treated as derived investigation artefacts.
-
-Where possible, retain separate outputs for each recovery method so that validation can compare independently generated files.
-
-## 4. Scripts
-
-Reviewed forensic scripts are stored under:
+Output:
 
 ```text
-scripts/
+b3ab520fa902f0f21d3e77d399aabde2  icat_IMG_2019.JPG
+b3ab520fa902f0f21d3e77d399aabde2  python_IMG_2019.JPG
 ```
 
-The investigation uses custom Python utilities for sector-based file carving.
+**IMG_0117.png:**
 
-Supporting offset definitions should be retained with the corresponding evidence item and documented with their calculation method.
+```bash
+md5sum icat_IMG_0117.png python_IMG_0117.png
+```
 
-## 5. Investigation Reports
-
-The final investigation report will be stored under:
+Output:
 
 ```text
-reports/fat32/
+5759303ec45a944b853f36a5084757f6  icat_IMG_0117.png
+5759303ec45a944b853f36a5084757f6  python_IMG_0117.png
 ```
 
-The report will consolidate the examination methodology, findings, evidence references, recovery results, validation outcomes, limitations, and conclusions.
+**Verification result:**
 
-## 6. Investigation Limitations
+Both pairs produced matching MD5 checksums. This indicates that the files recovered through `icat` and the Python script are byte-for-byte identical for each image.
 
-- The examination is based on the supplied forensic image.
-- The available material does not establish the original device owner or the circumstances of deletion.
-- No deletion timestamp has been established for the examined file.
-- The anomalous Written timestamp has not been explained.
-- A recognizable file signature does not alone prove complete recovery.
-- Hash comparison of independently retained recovery outputs is required before asserting identical recovered content.
-- Original acquisition records and chain-of-custody documentation have not yet been supplied or independently verified.
+This comparison establishes agreement between the two recovery methods. It does not independently establish that the recovered files are identical to the original pre-deletion files, as no separate original reference copies were available for comparison.
 
-## Related Documentation
+## 3. Consolidated Findings
 
-- [Project README](../../README.md)
-- [NTFS investigation](../ntfs/README.md)
-- [Raw disk investigation](../raw-disk/README.md)
+The investigation established the following:
+
+1. The supplied disk image uses the FAT32 filesystem.
+2. Two deleted image entries were identified using `fls`.
+3. Their allocation status, sizes, timestamps, filenames, and sector ranges were examined using `istat`.
+4. Both images were extracted using `icat`.
+5. Both images were independently extracted using a Python-based carving script.
+6. MD5 comparisons showed matching checksums between the two recovery methods for each image.
+
+## 4. Investigation Screenshots
+
+Screenshots are intended to document the execution and results of the investigation tasks.
+
+| Screenshot                                 | Description                                                             |
+| ------------------------------------------ | ----------------------------------------------------------------------- |
+| `01-fat32-environment.png`               | Forensics environment and evidence image verification                   |
+| `02-fat32-filesystem-identification.png` | Filesystem identification and metadata                                  |
+| `03-fat32-deleted-file-listing.png`      | Deleted image entries identified using `fls`                          |
+| `04-fat32-img-2019-metadata.png`         | Metadata examination of directory entry 4                               |
+| `05-fat32-img-0117-metadata.png`         | Metadata examination of directory entry 6                               |
+| `06-fat32-recovery-and-verification.png` | Recovery using `icat` and Python, followed by MD5 checksum comparison |
+
+## 5. Investigation Status
+
+The FAT32 investigation has completed deleted-file identification, metadata examination, image recovery using two methods, and MD5 comparison.
+
+Further examination and documentation may be added as the investigation progresses.
