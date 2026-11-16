@@ -193,6 +193,65 @@ Both pairs produced matching MD5 checksums. This indicates that the files recove
 
 This comparison establishes agreement between the two recovery methods. It does not independently establish that the recovered files are identical to the original pre-deletion files, as no separate original reference copies were available for comparison.
 
+### Task 8: Validate and Visually Inspect the Recovered Images
+
+After recovery and checksum comparison, the four output files were transferred from the Docker container to the Kali host for further inspection.
+
+**Step 1: Identify the recovered file formats**
+
+The `file` command was used to examine the recovered outputs:
+
+```bash
+file icat_IMG_2019.JPG
+file python_IMG_2019.JPG
+file icat_IMG_0117.png
+file python_IMG_0117.png
+```
+
+**Results:**
+
+| File                    | Identified format | Resolution   |
+| ----------------------- | ----------------- | ------------ |
+| `icat_IMG_2019.JPG`   | JPEG              | 3024 × 4032 |
+| `python_IMG_2019.JPG` | JPEG              | 3024 × 4032 |
+| `icat_IMG_0117.png`   | PNG               | 3024 × 4032 |
+| `python_IMG_0117.png` | PNG               | 3024 × 4032 |
+
+All four files were recognized as their expected image formats.
+
+**Step 2: Set up a temporary HTTP server**
+
+A Python HTTP server was started inside the Docker container to make the recovered files accessible from the Kali host.
+
+```bash
+python3 -m http.server 8000 --bind 0.0.0.0
+```
+
+The server exposed the working directory on port `8000`.
+
+**Step 3: Access and download the recovered files**
+
+The container's IP address was obtained from the Kali host, and the browser was used to access the server:
+
+```text
+http://CONTAINER_IP:8000/
+```
+
+The recovered files were downloaded from the directory listing to the Kali host.
+
+**Step 4: Visual inspection**
+
+The downloaded images were opened on Kali to confirm that the recovered image data could be displayed.
+
+The inspection provided visual confirmation that the recovered JPEG and PNG images could be opened and viewed.
+
+**Validation result:**
+
+- All four recovered files were recognized as JPEG or PNG images.
+- The `icat` and Python recovery outputs had matching MD5 checksums.
+- The recovered images were transferred to the Kali host.
+- The images opened successfully for visual inspection.
+
 ## 3. Consolidated Findings
 
 The investigation established the following:
@@ -203,22 +262,31 @@ The investigation established the following:
 4. Both images were extracted using `icat`.
 5. Both images were independently extracted using a Python-based carving script.
 6. MD5 comparisons showed matching checksums between the two recovery methods for each image.
+7. All four recovered files were recognized as valid JPEG or PNG file formats by the `file` utility.
+8. The recovered files were transferred from the Docker container to Kali and opened for visual inspection.
+
+The checksum comparison establishes byte-level agreement between the two recovery methods, while visual inspection provides additional evidence that the recovered image data can be displayed. Neither establishes equivalence to an unavailable original pre-deletion copy.
 
 ## 4. Investigation Screenshots
 
-Screenshots are intended to document the execution and results of the investigation tasks.
+Screenshots document the execution and results of the investigation tasks.
 
-| Screenshot                                 | Description                                                             |
-| ------------------------------------------ | ----------------------------------------------------------------------- |
-| `01-fat32-environment.png`               | Forensics environment and evidence image verification                   |
-| `02-fat32-filesystem-identification.png` | Filesystem identification and metadata                                  |
-| `03-fat32-deleted-file-listing.png`      | Deleted image entries identified using `fls`                          |
-| `04-fat32-img-2019-metadata.png`         | Metadata examination of directory entry 4                               |
-| `05-fat32-img-0117-metadata.png`         | Metadata examination of directory entry 6                               |
-| `06-fat32-recovery-and-verification.png` | Recovery using `icat` and Python, followed by MD5 checksum comparison |
+| Screenshot                                  | Description                                                             |
+| ------------------------------------------- | ----------------------------------------------------------------------- |
+| `01-fat32-environment.png`                | Forensics environment and evidence image verification                   |
+| `02-fat32-filesystem-identification.png`  | Filesystem identification and metadata                                  |
+| `03-fat32-deleted-file-listing.png`       | Deleted image entries identified using `fls`                          |
+| `04-fat32-img-2019-metadata.png`          | Metadata examination of directory entry 4                               |
+| `05-fat32-img-0117-metadata.png`          | Metadata examination of directory entry 6                               |
+| `06-fat32-recovery-and-verification.png`  | Recovery using `icat` and Python, followed by MD5 checksum comparison |
+| `07-fat32-http-server.png`                | Temporary Python HTTP server running inside the Docker container        |
+| `08-fat32-browser-directory.png`          | Browser displaying the HTTP server directory listing                    |
+| `09-fat32-downloaded-files.png`           | Four recovered files downloaded to Kali                                 |
+| `10-fat32-img-2019-visual-inspection.png` | Visual inspection of the recovered JPEG image                           |
+| `11-fat32-img-0117-visual-inspection.png` | Visual inspection of the recovered PNG image                            |
 
 ## 5. Investigation Status
 
-The FAT32 investigation has completed deleted-file identification, metadata examination, image recovery using two methods, and MD5 comparison.
+The FAT32 investigation has completed deleted-file identification, metadata examination, recovery using two methods, MD5 comparison, file-format identification, transfer to the Kali host, and visual inspection.
 
 Further examination and documentation may be added as the investigation progresses.
