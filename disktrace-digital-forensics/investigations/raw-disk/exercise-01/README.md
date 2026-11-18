@@ -1,4 +1,3 @@
-
 # Raw Disk Forensics – Exercise 1
 
 **Investigation:** 003 – Raw Disk Image Examination
@@ -320,15 +319,114 @@ The TIFF signatures occur shortly after the PNG and JPEG signatures. These may r
 
 The PNG signature was detected and a corresponding data segment was extracted by the all-signatures extraction command. Its completeness and validity still require manual investigation.
 
-### 6.6 Preliminary Automated Recovery Findings
+### 6.6 Manual File Signature Identification and Offset Analysis
 
-| Reference | Tool                 | Result                                 |
-| --------- | -------------------- | -------------------------------------- |
-| F-05      | Foremost             | One JPEG extracted                     |
-| F-06      | Foremost and file    | JPEG structure and metadata recognized |
-| F-07      | Foremost and SHA-256 | Extracted JPEG hash recorded           |
-| F-08      | Binwalk              | Four file signatures detected          |
-| F-09      | Binwalk extraction   | Four data segments produced            |
+This stage investigates the PNG file signature identified during the automated Binwalk examination. The objective is to locate the exact starting offset of the PNG data and investigate its expected ending signature.
+
+#### 6.6.1 Identifying the PNG Header
+
+**PNG signature:**
+
+```text
+89 50 4E 47 0D 0A 1A 0A
+```
+
+The hexadecimal dump was searched using:
+
+```bash
+xxd corrupted_drive.dd | egrep "89 ?50 ?4e ?47"
+```
+
+**Observed output:**
+
+```text
+021c6120: 7c83 c888 c01e 407a c1ae 8950 4e47 0d0a  |.....@z...PNG..
+```
+
+**Offset calculation:**
+
+The displayed line begins at hexadecimal offset `0x021C6120`.
+
+Each line contains 16 bytes, and the PNG signature begins at byte position 10 (hexadecimal A) within the displayed line.
+
+Therefore:
+
+```text
+0x021C6120 + 0x0A = 0x021C612A
+```
+
+The identified PNG starting offset is:
+
+- Hexadecimal: `0x21C612A`
+- Decimal: `35,414,314`
+
+**Observation:**
+
+The PNG header was located at offset `35,414,314`, matching the offset previously reported by Binwalk.
+
+**Interpretation:**
+
+The matching offsets provide consistent evidence that the PNG signature identified by Binwalk corresponds to the signature located during manual hexadecimal inspection.
+
+#### 6.6.2 Investigating the PNG End Signature
+
+The expected PNG IEND signature is:
+
+```text
+49 45 4E 44 AE 42 60 82
+```
+
+The initial search command was:
+
+```bash
+xxd corrupted_drive.dd | egrep "42 ?60 ?82"
+```
+
+**Observed output:**
+
+```text
+00e04990: 4260 820e ec38 60db 6117 0359 ccf8 65ab
+01166e20: 9f47 40c5 4260 82e7 b077 e125 222d e950
+```
+
+**Observation:**
+
+Two occurrences of the byte sequence `42 60 82` were identified.
+
+**Interpretation:**
+
+The search examined only the final three bytes of the expected IEND signature. These occurrences cannot independently establish the presence or location of a valid PNG ending marker.
+
+A subsequent search for the complete eight-byte IEND signature is required to determine whether the expected PNG ending sequence is present.
+
+**Pending verification:**
+
+The complete IEND signature search and its results will be documented after execution.
+
+#### 6.6.3 File Signature Reference
+
+File signatures, also called magic numbers or magic bytes, are byte sequences associated with particular file formats.
+
+Examples include:
+
+- PNG – Portable Network Graphics
+- JPEG – Joint Photographic Experts Group
+- TIFF – Tagged Image File Format
+- GIF – Graphics Interchange Format
+- PDF – Portable Document Format
+
+The GCK File Signature Table is used as a reference for researching file signatures and identifying file formats.
+
+Reference: https://filesig.search.org/
+
+#### 6.6.4 Preliminary Findings
+
+| Reference | Examination            | Finding                                                                                |
+| --------- | ---------------------- | -------------------------------------------------------------------------------------- |
+| F-10      | PNG header search      | PNG signature located                                                                  |
+| F-11      | Offset calculation     | PNG begins at decimal offset 35,414,314 (`0x21C612A`)                                |
+| F-12      | Partial footer search  | Two occurrences of `42 60 82` identified; neither confirms a complete IEND signature |
+| F-13      | Complete footer search | Pending verification                                                                   |
 
 ## 7. Screenshots
 
