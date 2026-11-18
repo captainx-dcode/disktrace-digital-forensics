@@ -9,7 +9,7 @@
 
 This investigation examines a supplied raw disk image to identify recognizable file structures, investigate potentially recoverable data, and evaluate file-carving techniques.
 
-The examination uses filesystem analysis, file-signature identification, hexadecimal inspection, and file-carving tools. Recovered data will be assessed carefully to distinguish between signature detection, extraction, and successful file validation.
+The examination uses filesystem analysis, file-signature identification, hexadecimal inspection, automated recovery tools, and Python-based file carving. Recovered data will be assessed carefully to distinguish between signature detection, extraction, and successful file validation.
 
 ## 2. Investigation Objectives
 
@@ -17,7 +17,8 @@ The examination uses filesystem analysis, file-signature identification, hexadec
 - Examine recognizable filesystem and file signatures.
 - Identify potentially recoverable files.
 - Apply file-carving techniques using forensic tools and Python.
-- Validate extracted files using file identification, metadata inspection, and cryptographic hashes.
+- Validate extracted files using file identification, metadata inspection, image rendering, and cryptographic hashes.
+- Compare files recovered by different carving methods.
 - Document findings, limitations, and recovery outcomes.
 
 ## 3. Environment Preparation
@@ -78,8 +79,9 @@ All tools included in the availability check were found. No installation was req
 2. Evidence identification and preliminary examination
 3. Automated file recovery
 4. Manual file-signature analysis and carving
-5. Recovery validation
-6. Findings and conclusion
+5. Python-based automated PNG carving
+6. Recovery validation and comparison
+7. Findings and conclusion
 
 ## 5. Evidence Inventory
 
@@ -260,7 +262,7 @@ binwalk --run-as=root -e corrupted_drive.dd
 
 The signature scan reported the same four entries.
 
-Because the extraction directory was not available after this attempt, extraction was retried using:
+Extraction was then performed using:
 
 ```bash
 binwalk --run-as=root -D='.*' corrupted_drive.dd
@@ -317,9 +319,9 @@ The extracted files are named using their hexadecimal starting offsets. Their ex
 
 The TIFF signatures occur shortly after the PNG and JPEG signatures. These may represent embedded image metadata rather than separate standalone TIFF images. This requires further examination.
 
-The PNG signature was detected and a corresponding data segment was extracted by the all-signatures extraction command. Its completeness and validity still require manual investigation.
+The PNG signature was detected and a corresponding data segment was extracted. Its completeness and validity require further investigation.
 
-### 6.6 Manual File Signature Identification and Offset Analysis
+### 6.6 Manual File-Signature Identification and Offset Analysis
 
 This stage investigates the PNG file signature identified during the automated Binwalk examination. The objective is to locate the exact starting offset of the PNG data and investigate its expected ending signature.
 
@@ -397,11 +399,23 @@ Two occurrences of the byte sequence `42 60 82` were identified.
 
 The search examined only the final three bytes of the expected IEND signature. These occurrences cannot independently establish the presence or location of a valid PNG ending marker.
 
-A subsequent search for the complete eight-byte IEND signature is required to determine whether the expected PNG ending sequence is present.
+A subsequent complete signature search was performed during the Python carving stage. The script searched for the full eight-byte sequence:
 
-**Pending verification:**
+```text
+49 45 4E 44 AE 42 60 82
+```
 
-The complete IEND signature search and its results will be documented after execution.
+**Observed result:**
+
+```text
+Complete IEND signatures found: 0
+```
+
+**Finding:**
+
+No complete eight-byte PNG IEND signature was identified by the Python search in the supplied evidence image.
+
+This means that the PNG's expected ending marker was not located using the implemented signature search. The finding does not, on its own, explain why the marker is absent or prove that the PNG image data is entirely unrecoverable.
 
 #### 6.6.3 File Signature Reference
 
@@ -426,31 +440,319 @@ Reference: https://filesig.search.org/
 | F-10      | PNG header search      | PNG signature located                                                                  |
 | F-11      | Offset calculation     | PNG begins at decimal offset 35,414,314 (`0x21C612A`)                                |
 | F-12      | Partial footer search  | Two occurrences of `42 60 82` identified; neither confirms a complete IEND signature |
-| F-13      | Complete footer search | Pending verification                                                                   |
+| F-13      | Complete footer search | No complete eight-byte IEND signature found                                            |
 
-## 7. Screenshots
+### 6.7 Automated PNG Carving Using Python
 
-| Screenshot                                  | Description                                                                                    |
-| ------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `01-raw-disk-preliminary-examination.png` | File identification, disk geometry, and filesystem listing                                     |
-| `02-automated-file-recovery.png`          | Foremost extraction, JPEG identification, SHA-256 result, and Binwalk detection and extraction |
+#### 6.7.1 Objective
 
-## 8. Limitations
+Develop and execute a Python script to locate PNG file signatures within the supplied raw disk image and carve the identified data into a separate output file.
 
-- The generic `file` identification result does not establish the absence of filesystem structures.
-- The `fdisk` output did not display partition entries, but this does not rule out unpartitioned filesystem data or embedded file structures.
-- The high-entropy warning is heuristic and cannot independently confirm encryption.
-- Foremost's JPEG identification does not independently prove that the image is complete or fully decodable.
-- Binwalk's signature detections do not prove that each detected signature represents an independent file.
-- The completeness of the Binwalk-extracted data segments has not yet been established.
-- The SHA-256 hash has been recorded, but no comparison against the earlier recovered JPEG has yet been documented.
+The script searches for:
 
-## 9. Conclusion
+- PNG header: `89 50 4E 47 0D 0A 1A 0A`
+- PNG IEND footer: `49 45 4E 44 AE 42 60 82`
 
-The automated recovery stage identified potentially recoverable image data within the raw disk image.
+The script records signature offsets, extracts the data, and calculates a SHA-256 hash of the recovered output.
 
-Foremost extracted one JPEG file, and Binwalk identified four file signatures and produced four corresponding data segments using its all-signatures extraction option.
+#### 6.7.2 Implementation
 
-These results provide a basis for further manual carving and validation. The investigation will continue by examining the file signatures and determining the actual boundaries and completeness of the recovered data.
+**Script:** `carving_png.py`
 
-The investigation remains in progress.
+The Python implementation uses binary file handling and signature searches to locate PNG data within `corrupted_drive.dd`.
+
+The carving logic searches for PNG headers and complete IEND signatures. It selects the first IEND signature occurring after the PNG header. Where no complete IEND signature is found, it extracts from the header to the end of the evidence image.
+
+The output is saved as:
+
+`M2_TL_recovered_files/recovered_0.png`
+
+#### 6.7.3 Script Compilation
+
+The Python scripts were checked for syntax errors using:
+
+```bash
+python3 -m py_compile carvepng.py
+python3 -m py_compile carving_png.py
+```
+
+**Observed result:**
+
+Both commands completed without displaying errors.
+
+**Interpretation:**
+
+The Python interpreter successfully compiled both scripts without reporting syntax errors. This check does not independently establish that the carving logic produces a complete or valid image.
+
+#### 6.7.4 Execution Results
+
+The script was executed using:
+
+```bash
+python3 carving_png.py
+```
+
+**Observed output:**
+
+```text
+=== PNG CARVING REPORT ===
+Evidence image: corrupted_drive.dd
+Image size: 52428800 bytes
+PNG headers found: 1
+Complete IEND signatures found: 0
+
+=== RECOVERY RESULTS ===
+
+File: M2_TL_recovered_files/recovered_0.png
+Start offset: 35414314 (0x21c612a)
+End offset (exclusive): 52428800 (0x3200000)
+Recovery method: No IEND signature found; carved to end of image
+Extracted size: 17014486 bytes
+SHA-256: 414fd63e64a810c453c0c46c4f14cc49233c2e15780bf67a0b68ee06f15ab838
+
+=== CARVING COMPLETE ===
+```
+
+**Observed findings:**
+
+| Finding                        | Observed result            |
+| ------------------------------ | -------------------------- |
+| Evidence image                 | `corrupted_drive.dd`     |
+| Evidence image size            | 52,428,800 bytes           |
+| PNG headers found              | 1                          |
+| Complete IEND signatures found | 0                          |
+| PNG header offset              | 35,414,314 (`0x21c612a`) |
+| Extraction end offset          | 52,428,800 (`0x3200000`) |
+| Extraction method              | Carved to end of image     |
+| Extracted file size            | 17,014,486 bytes           |
+| Output filename                | `recovered_0.png`        |
+
+No complete PNG IEND signature was detected. Consequently, the script used the end of the disk image as the extraction boundary.
+
+The extracted size is consistent with the difference between the image size and the PNG starting offset:
+
+```text
+52,428,800 - 35,414,314 = 17,014,486 bytes
+```
+
+#### 6.7.5 Preliminary Output Examination
+
+The recovered file was examined using:
+
+```bash
+file M2_TL_recovered_files/recovered_0.png
+```
+
+**Observed output:**
+
+```text
+M2_TL_recovered_files/recovered_0.png: PNG image data, 3024 x 4032, 8-bit/color RGB, non-interlaced
+```
+
+The file size was examined using:
+
+```bash
+stat -c '%n | %s bytes' M2_TL_recovered_files/recovered_0.png
+```
+
+**Observed output:**
+
+```text
+M2_TL_recovered_files/recovered_0.png | 17014486 bytes
+```
+
+The first 32 bytes were inspected using:
+
+```bash
+xxd -l 32 M2_TL_recovered_files/recovered_0.png
+```
+
+**Observed output:**
+
+```text
+00000000: 8950 4e47 0d0a 1a0a 0000 000d 4948 4452  .PNG........IHDR
+00000010: 0000 0bd0 0000 0fc0 0802 0000 002f 798d  ............./y.
+```
+
+The SHA-256 hash was calculated using:
+
+```bash
+sha256sum M2_TL_recovered_files/recovered_0.png
+```
+
+**Observed output:**
+
+```text
+414fd63e64a810c453c0c46c4f14cc49233c2e15780bf67a0b68ee06f15ab838  M2_TL_recovered_files/recovered_0.png
+```
+
+**Observations:**
+
+- The `file` utility recognized the extracted data as PNG.
+- The reported image dimensions are 3024 × 4032 pixels.
+- The first eight bytes match the PNG signature.
+- The following bytes contain an IHDR chunk identifying the image dimensions.
+- The extracted file size is 17,014,486 bytes.
+- The SHA-256 hash was recorded.
+
+**Preliminary interpretation:**
+
+The carving operation successfully extracted a data segment beginning at the identified PNG header. The PNG signature and IHDR structure were present, and the `file` utility recognized the resulting data as PNG.
+
+However, the absence of a detected IEND signature means that complete file recovery has not yet been established. The extracted segment may contain incomplete image data or unrelated trailing bytes.
+
+Further validation will compare the Python-carved output against the data segments produced by Binwalk. The Foremost output will also be examined to establish which recovered files are available for comparison.
+
+**Status:** Automated PNG carving completed; recovery validation pending.
+
+
+## 7. Recovery Validation and Comparison
+
+This stage validates the files recovered using Binwalk, Foremost and the custom Python carving script. Validation included file identification, exact file-size comparison, MD5 and SHA-256 checksums, binary comparison and visual inspection.
+
+### 7.1 Recovered File Inventory
+
+The following recovery outputs were examined:
+
+| Recovery method | Output file                               | Identified type |
+| --------------- | ----------------------------------------- | --------------- |
+| Binwalk         | `_corrupted_drive.dd.extracted/21C612A` | PNG             |
+| Python carving  | `M2_TL_recovered_files/recovered_0.png` | PNG             |
+| Binwalk         | `_corrupted_drive.dd.extracted/255F9EF` | JPEG            |
+| Foremost        | `extracted_files/jpg/00076540.jpg`      | JPEG            |
+
+The two additional Binwalk outputs, `21C62D4` and `255FA0D`, were identified by the `file` utility as TIFF data. They were retained as separate signature-detection results and were not treated as independently validated image recoveries.
+
+### 7.2 File Identification
+
+The `file` utility was used to identify the recovered candidates.
+
+Results:
+
+- Binwalk PNG: PNG image data, 3024 × 4032, 8-bit RGB, non-interlaced.
+- Python PNG: PNG image data, 3024 × 4032, 8-bit RGB, non-interlaced.
+- Binwalk JPEG: JPEG image data, JFIF 1.02, 3024 × 4032, with Apple iPhone 13 Pro EXIF metadata.
+- Foremost JPEG: JPEG image data, JFIF 1.02, 3024 × 4032, with Apple iPhone 13 Pro EXIF metadata.
+
+The file identification results confirm that the candidates contain recognizable image-format headers. File identification alone does not establish that an image is complete or can be decoded successfully.
+
+### 7.3 PNG Checksum Comparison
+
+The Binwalk PNG candidate and Python-carved PNG were compared using MD5 and SHA-256.
+
+**MD5**
+
+| File                             | MD5                                  |
+| -------------------------------- | ------------------------------------ |
+| Binwalk PNG (`21C612A`)        | `24ee38f3c446f148eac489facf20ecf1` |
+| Python PNG (`recovered_0.png`) | `24ee38f3c446f148eac489facf20ecf1` |
+
+**SHA-256**
+
+| File                             | SHA-256                                                              |
+| -------------------------------- | -------------------------------------------------------------------- |
+| Binwalk PNG (`21C612A`)        | `414fd63e64a810c453c0c46c4f14cc49233c2e15780bf67a0b68ee06f15ab838` |
+| Python PNG (`recovered_0.png`) | `414fd63e64a810c453c0c46c4f14cc49233c2e15780bf67a0b68ee06f15ab838` |
+
+**Finding:** Both checksum algorithms produced matching values. This establishes that the Binwalk and Python PNG outputs are byte-for-byte identical.
+
+However, both PNG candidates failed to display during visual inspection. The matching checksums therefore demonstrate consistency between the two extraction outputs, not successful or complete PNG recovery.
+
+The earlier signature analysis also found no complete PNG IEND sequence in the evidence image. The Python carving script consequently extracted from the PNG header to the end of the disk image.
+
+### 7.4 JPEG Checksum and Binary Comparison
+
+The Binwalk JPEG candidate and Foremost JPEG output were compared.
+
+**MD5**
+
+| File                             | MD5                                  |
+| -------------------------------- | ------------------------------------ |
+| Binwalk JPEG (`255F9EF`)       | `cc9116740a058bdccca628d1e6fe1f78` |
+| Foremost JPEG (`00076540.jpg`) | `bfc40fd6b8adf2e7745d833de36b4bc0` |
+
+**SHA-256**
+
+| File                             | SHA-256                                                              |
+| -------------------------------- | -------------------------------------------------------------------- |
+| Binwalk JPEG (`255F9EF`)       | `e40e5cd7fc9ca673d2417accd86a189499133b3dfbead8b4f5ef3c5aad1e5ce2` |
+| Foremost JPEG (`00076540.jpg`) | `c22411c0175a240ab2f96257d6babaa1c6068a3a653ed346ec86444dc8c146c9` |
+
+The checksums differ because the two extracted files have different lengths:
+
+| Candidate     |       Exact size |
+| ------------- | ---------------: |
+| Binwalk JPEG  | 13,239,825 bytes |
+| Foremost JPEG | 10,626,782 bytes |
+
+A further binary comparison established that the Foremost output is an exact prefix of the Binwalk output. The first 10,626,782 bytes are identical, while the Binwalk output contains an additional 2,613,043 bytes.
+
+**Finding:** The different checksums do not indicate that the recovered JPEG contents disagree throughout. They reflect different extraction boundaries. Foremost extracted the JPEG through its detected end marker, while the Binwalk output continued beyond the Foremost file boundary.
+
+Both JPEG candidates displayed successfully during visual inspection.
+
+### 7.5 Visual Inspection
+
+The four recovered candidates were downloaded from the forensic container to the Kali environment and opened for visual inspection.
+
+| Candidate     | Visual inspection      |
+| ------------- | ---------------------- |
+| Binwalk PNG   | Failed to display      |
+| Python PNG    | Failed to display      |
+| Binwalk JPEG  | Displayed successfully |
+| Foremost JPEG | Displayed successfully |
+
+The JPEG outputs were visually viewable. The PNG outputs were not successfully displayed and are therefore documented as unsuccessful visual recoveries.
+
+Visual inspection was used as an additional validation step alongside file identification and checksum comparison.
+
+### 7.6 Overall Validation Findings
+
+- The Binwalk and Python PNG candidates have matching MD5 and SHA-256 checksums but could not be displayed.
+- The Binwalk and Foremost JPEG candidates have different checksums and file sizes.
+- Binary comparison confirmed that the Foremost JPEG is an exact prefix of the larger Binwalk JPEG output.
+- Both JPEG candidates displayed successfully.
+- Binwalk also identified two TIFF data signatures, which were not independently validated as complete images.
+
+These results distinguish between signature detection, data extraction, checksum consistency and successful visual recovery.
+
+## 8. Screenshots and Evidence
+
+The following screenshots document the examination and validation process.
+
+| Screenshot                                    | Description                                                              |
+| --------------------------------------------- | ------------------------------------------------------------------------ |
+| `01-raw-disk-preliminary-examination.png`   | Initial raw disk examination using `file`, `fdisk` and `fls`       |
+| `02-automated-file-recovery.png`            | Foremost and Binwalk automated recovery results                          |
+| `03-png-signature-and-offset-analysis.png`  | PNG signature and offset analysis                                        |
+| `04-python-png-carving.png`                 | Python-based PNG carving execution and output                            |
+| `05-md5-and-sha256-checksum-comparison.png` | MD5 and SHA-256 comparisons for PNG and JPEG candidates                  |
+| `06-recovery-transfer-validation.png`       | Local HTTP server and recovery-file transfer process                     |
+| `07-recovered-file-identification.png`      | File identification results for recovered candidates                     |
+| `08-binwalk-png-display-error.png`          | Failed visual inspection of the Binwalk PNG candidate                    |
+| `09-python-png-display-error.png`           | Failed visual inspection of the Python PNG candidate                     |
+| `10-jpeg-recovery-display.png`              | Successful visual inspection of the Binwalk and Foremost JPEG candidates |
+
+## 9. Limitations
+
+The examination identified several limitations:
+
+1. The raw disk image did not expose a recognizable filesystem or partition structure through the preliminary checks.
+2. The complete PNG IEND signature was not found during the signature search.
+3. The PNG carving process therefore extracted data from the identified PNG header to the end of the evidence image.
+4. Matching PNG checksums establish that two tools produced identical bytes, but do not establish that the resulting file is complete or valid.
+5. Binwalk and Foremost used different extraction boundaries for the JPEG candidate, resulting in different file sizes and checksums.
+6. The `file` utility identifies recognizable file signatures and metadata but does not replace full image decoding or visual validation.
+7. The TIFF signatures detected by Binwalk were not independently examined to establish whether they represented complete standalone images.
+
+## 10. Conclusion
+
+This investigation applied raw disk forensic techniques to examine a 50 MiB disk image without relying on conventional filesystem metadata.
+
+The examination used preliminary disk inspection, automated recovery with Foremost and Binwalk, manual file-signature and offset analysis, and a Python-based carving script.
+
+The validation stage established that the Binwalk and Python PNG outputs were byte-for-byte identical, although neither could be displayed successfully. The two JPEG outputs had different extraction boundaries, with the Foremost output confirmed as an exact prefix of the Binwalk output. Both JPEG candidates displayed successfully.
+
+The exercise demonstrates the importance of validating recovered data through multiple independent checks. Detecting a file signature, extracting bytes, obtaining matching checksums and successfully displaying a recovered file are distinct outcomes and should be reported separately.
+
+**Investigation status:** Examination and recovery validation documented. PNG visual recovery unsuccessful; JPEG visual recovery successful
